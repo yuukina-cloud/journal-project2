@@ -308,4 +308,80 @@ async function renderTasks() {
     `;
     el.querySelector(".toggle").addEventListener("click", () => toggleTaskDone(t));
     el.querySelector(".del").addEventListener("click", () => {
-      co
+      const ok = confirm("このタスクを削除しますか？");
+      if (ok) deleteTask(t.id);
+    });
+    list.appendChild(el);
+  }
+}
+
+async function renderAll() {
+  $("#heroTitle").textContent = `${currentJourTitle} のジャーナル`;
+  await Promise.all([renderJour(), renderMemos(), renderTasks()]);
+}
+
+// ===== Tabs =====
+function setupTabs() {
+  $$(".tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      $$(".tab").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+
+      $("#pane-memos").classList.toggle("hidden", tab !== "memos");
+      $("#pane-tasks").classList.toggle("hidden", tab !== "tasks");
+    });
+  });
+}
+
+// ===== Toast (simple) =====
+let toastTimer;
+function toast(msg) {
+  clearTimeout(toastTimer);
+  let el = $("#toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toast";
+    el.style.position = "fixed";
+    el.style.left = "50%";
+    el.style.bottom = "70px";
+    el.style.transform = "translateX(-50%)";
+    el.style.padding = "10px 12px";
+    el.style.borderRadius = "14px";
+    el.style.border = "1px solid rgba(255,255,255,.12)";
+    el.style.background = "rgba(11,18,32,.92)";
+    el.style.color = "rgba(232,238,252,.95)";
+    el.style.backdropFilter = "blur(10px)";
+    el.style.zIndex = "9999";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = "1";
+  toastTimer = setTimeout(() => { el.style.opacity = "0"; }, 1800);
+}
+
+// ===== Init =====
+async function main() {
+  await openDB();
+
+  // UI hooks
+  $("#newTodayBtn").addEventListener("click", ensureTodayJour);
+  $("#addMemoBtn").addEventListener("click", addMemo);
+  $("#addTaskBtn").addEventListener("click", addTask);
+  $("#addMemoQuick").addEventListener("click", addMemo);
+  $("#addTaskQuick").addEventListener("click", addTask);
+  $("#refreshJour").addEventListener("click", renderJour);
+  $("#jourSearch").addEventListener("input", renderJour);
+  $("#hideDone").addEventListener("change", renderTasks);
+
+  setupTabs();
+
+  // Start with today
+  $("#todayPill").textContent = todayISO();
+  await ensureTodayJour();
+}
+
+main().catch((e) => {
+  console.error(e);
+  alert("初期化に失敗しました。ブラウザがIndexedDBに対応しているか確認してね。");
+});
