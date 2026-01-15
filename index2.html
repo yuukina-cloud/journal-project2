@@ -6,6 +6,8 @@
   <title>Journal Project</title>
   <link rel="stylesheet" href="style.css" />
   <meta name="theme-color" content="#0b1220">
+  <!-- ✅ deferでDOM完成後に実行 -->
+  <script src="./app.js?v=1" defer></script>
 </head>
 
 <body>
@@ -60,17 +62,16 @@
       <!-- Right: Memos + Tasks -->
       <section class="card">
         <div class="tabs">
-          <button class="tab active" data-tab="memos">メモ</button>
-          <button class="tab" data-tab="tasks">タスク</button>
+          <button class="tab active" data-tab="memos" type="button">メモ</button>
+          <button class="tab" data-tab="tasks" type="button">タスク</button>
         </div>
 
         <!-- MEMOS -->
         <div class="pane" id="pane-memos">
           <div class="card-head">
             <h2>メモ</h2>
-            <button class="btn" id="addMemoBtn">＋ 追加</button>
+            <button class="btn" id="addMemoBtn" type="button">＋ 追加</button>
           </div>
-
           <div class="list" id="memoList"></div>
         </div>
 
@@ -78,7 +79,7 @@
         <div class="pane hidden" id="pane-tasks">
           <div class="card-head">
             <h2>タスク</h2>
-            <button class="btn" id="addTaskBtn">＋ 追加</button>
+            <button class="btn" id="addTaskBtn" type="button">＋ 追加</button>
           </div>
 
           <div class="filters">
@@ -99,26 +100,24 @@
     <form method="dialog" class="modal-box" id="modalForm">
       <div class="modal-head">
         <h3 id="modalTitle">入力</h3>
-        <button class="btn ghost" value="cancel" aria-label="閉じる">✕</button>
+        <button class="btn ghost" value="cancel" aria-label="閉じる" type="submit">✕</button>
       </div>
 
       <label class="field">
         <span id="modalLabel">タイトル</span>
-        <input class="input" id="modalInput" autocomplete="off" maxlength="120" required />
+        <input class="input" id="modalInput" autocomplete="off" maxlength="200" required />
       </label>
 
       <div class="modal-actions">
-        <button class="btn ghost" value="cancel">キャンセル</button>
-        <button class="btn" id="modalOk" value="ok">OK</button>
+        <button class="btn ghost" value="cancel" type="submit">キャンセル</button>
+        <button class="btn" id="modalOk" value="ok" type="submit">OK</button>
       </div>
       <p class="small" id="modalHelp"></p>
     </form>
   </dialog>
 
   <footer class="footer">
-    <span>保存先：この端末のブラウザ（サーバ不要）</span>
+    <span>保存先：この端末のブラウザ（サーバ不要 / GitHub Pages対応）</span>
   </footer>
-
-  <script src="app.js"></script>
 </body>
 </html>
