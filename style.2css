@@ -138,8 +138,8 @@ body{
   justify-content:space-between;
   gap:10px;
 }
-.item .left{display:flex; flex-direction:column; gap:3px}
-.item .name{font-weight:800}
+.item .left{display:flex; flex-direction:column; gap:3px; min-width:0}
+.item .name{font-weight:800; word-break:break-word}
 .item .meta{color:var(--muted); font-size:12px}
 .item .right{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
 
