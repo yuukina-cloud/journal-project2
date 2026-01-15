@@ -2,40 +2,71 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
-const todayISO = () => new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+const todayISO = () => new Date().toISOString().slice(0, 10);
 const nowTime = () => new Date().toLocaleString("ja-JP", { hour12: false });
 
 function escapeHTML(s) {
-  return s.replace(/[&<>"']/g, (c) => ({
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c]));
 }
 
-// ===== IndexedDB wrapper (tiny) =====
+// ===== Toast =====
+let toastTimer;
+function toast(msg) {
+  clearTimeout(toastTimer);
+  let el = $("#toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toast";
+    el.style.position = "fixed";
+    el.style.left = "50%";
+    el.style.bottom = "70px";
+    el.style.transform = "translateX(-50%)";
+    el.style.padding = "10px 12px";
+    el.style.borderRadius = "14px";
+    el.style.border = "1px solid rgba(255,255,255,.12)";
+    el.style.background = "rgba(11,18,32,.92)";
+    el.style.color = "rgba(232,238,252,.95)";
+    el.style.backdropFilter = "blur(10px)";
+    el.style.zIndex = "9999";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = "1";
+  toastTimer = setTimeout(() => { el.style.opacity = "0"; }, 1800);
+}
+
+// ===== IndexedDB =====
 const DB_NAME = "Yuki_DB_Web";
 const DB_VER = 1;
-
 let db;
 
 function openDB() {
   return new Promise((resolve, reject) => {
+    if (!("indexedDB" in window)) {
+      reject(new Error("このブラウザはIndexedDBに対応していません。Chrome/Safari最新版で試してね。"));
+      return;
+    }
+
     const req = indexedDB.open(DB_NAME, DB_VER);
 
     req.onupgradeneeded = (e) => {
       const d = e.target.result;
 
-      // jour: { id (auto), title (unique) }
-      const jour = d.createObjectStore("jour", { keyPath: "jour_id", autoIncrement: true });
-      jour.createIndex("jour_title", "jour_title", { unique: true });
-
-      // memos: { id (auto), title, jour_title }
-      const memos = d.createObjectStore("memos", { keyPath: "memo_id", autoIncrement: true });
-      memos.createIndex("jour_title", "jour_title", { unique: false });
-
-      // tasks: { id (auto), title, done, jour_title }
-      const tasks = d.createObjectStore("tasks", { keyPath: "id", autoIncrement: true });
-      tasks.createIndex("jour_title", "jour_title", { unique: false });
-      tasks.createIndex("done", "done", { unique: false });
+      if (!d.objectStoreNames.contains("jour")) {
+        const jour = d.createObjectStore("jour", { keyPath: "jour_id", autoIncrement: true });
+        jour.createIndex("jour_title", "jour_title", { unique: true });
+      }
+      if (!d.objectStoreNames.contains("memos")) {
+        const memos = d.createObjectStore("memos", { keyPath: "memo_id", autoIncrement: true });
+        memos.createIndex("jour_title", "jour_title", { unique: false });
+      }
+      if (!d.objectStoreNames.contains("tasks")) {
+        const tasks = d.createObjectStore("tasks", { keyPath: "id", autoIncrement: true });
+        tasks.createIndex("jour_title", "jour_title", { unique: false });
+        tasks.createIndex("done", "done", { unique: false });
+      }
     };
 
     req.onsuccess = () => { db = req.result; resolve(db); };
@@ -91,10 +122,7 @@ function idbIndexGetAll(storeName, indexName, indexValue) {
   });
 }
 
-// ===== App state =====
-let currentJourTitle = todayISO();
-
-// ===== Modal helper =====
+// ===== Modal =====
 const modal = $("#modal");
 const modalTitle = $("#modalTitle");
 const modalLabel = $("#modalLabel");
@@ -119,18 +147,19 @@ function promptModal({ title, label, placeholder = "", help = "", initial = "" }
   });
 }
 
-// ===== Core actions =====
+// ===== State =====
+let currentJourTitle = todayISO();
+
+// ===== Actions =====
 async function ensureTodayJour() {
   const title = todayISO();
   currentJourTitle = title;
   $("#todayPill").textContent = title;
 
-  // Try insert if not exists
   try {
     await idbAdd("jour", { jour_title: title, created_at: nowTime() });
     toast("✅ 今日のジャーナルを作成したよ！");
-  } catch (e) {
-    // likely unique constraint
+  } catch {
     toast("📝 今日のジャーナルに追加しよう！");
   }
   await renderAll();
@@ -146,13 +175,29 @@ async function setCurrentJour(title) {
 async function addMemo() {
   const v = await promptModal({
     title: "メモ追加",
-    label: "メモ名",
+    label: "メモ内容",
     placeholder: "例）朝：やること/気づき",
-    help: "保存はこの端末のブラウザ内に行われます。",
+    help: "OKで保存されます（この端末のブラウザ内）。",
   });
   if (!v) return;
   await idbAdd("memos", { memo_title: v, jour_title: currentJourTitle, created_at: nowTime() });
   toast("✅ メモを追加したよ");
+  await renderMemos();
+}
+
+async function editMemo(memo) {
+  const v = await promptModal({
+    title: "メモ編集",
+    label: "メモ内容",
+    placeholder: "ここを編集してOK",
+    help: "OKで上書き保存されます。",
+    initial: memo.memo_title
+  });
+  if (v === null) return;
+  if (!v) { toast("⚠ 空は保存できないよ"); return; }
+
+  await idbPut("memos", { ...memo, memo_title: v });
+  toast("✅ メモを更新したよ");
   await renderMemos();
 }
 
@@ -161,7 +206,7 @@ async function addTask() {
     title: "タスク作成",
     label: "タスク名",
     placeholder: "例）洗濯 / レポート / 筋トレ",
-    help: "完了したらチェックしてね。",
+    help: "完了したら「完了」ボタンで切替できます。",
   });
   if (!v) return;
   await idbAdd("tasks", { title: v, done: 0, jour_title: currentJourTitle, created_at: nowTime() });
@@ -170,12 +215,10 @@ async function addTask() {
 }
 
 async function deleteJour(jourTitle) {
-  // Delete jour row itself
   const allJour = await idbGetAll("jour");
   const target = allJour.find(j => j.jour_title === jourTitle);
   if (!target) return;
 
-  // Also delete related memos/tasks
   const memos = await idbIndexGetAll("memos", "jour_title", jourTitle);
   const tasks = await idbIndexGetAll("tasks", "jour_title", jourTitle);
 
@@ -184,7 +227,6 @@ async function deleteJour(jourTitle) {
   await idbDelete("jour", target.jour_id);
 
   toast("🗑 ジャーナルを削除したよ");
-  // Move to today
   await ensureTodayJour();
 }
 
@@ -208,12 +250,12 @@ async function toggleTaskDone(task) {
 // ===== Rendering =====
 async function renderJour() {
   const list = $("#jourList");
-  const q = $("#jourSearch").value.trim().toLowerCase();
+  const q = ($("#jourSearch").value || "").trim().toLowerCase();
 
   let rows = await idbGetAll("jour");
-  rows.sort((a, b) => (a.jour_title > b.jour_title ? -1 : 1)); // newest first
+  rows.sort((a, b) => (a.jour_title > b.jour_title ? -1 : 1));
 
-  if (q) rows = rows.filter(r => (r.jour_title || "").toLowerCase().includes(q));
+  if (q) rows = rows.filter(r => String(r.jour_title || "").toLowerCase().includes(q));
 
   list.innerHTML = "";
   if (!rows.length) {
@@ -231,8 +273,8 @@ async function renderJour() {
         <div class="meta">${isCurrent ? "現在開いているジャーナル" : "タップで開く"}</div>
       </div>
       <div class="right">
-        ${isCurrent ? `<span class="badge">OPEN</span>` : `<button class="btn ghost openJour">開く</button>`}
-        <button class="btn ghost delJour">削除</button>
+        ${isCurrent ? `<span class="badge">OPEN</span>` : `<button class="btn ghost openJour" type="button">開く</button>`}
+        <button class="btn ghost delJour" type="button">削除</button>
       </div>
     `;
 
@@ -266,13 +308,17 @@ async function renderMemos() {
         <div class="meta">作成: ${escapeHTML(m.created_at || "")}</div>
       </div>
       <div class="right">
-        <button class="btn ghost">削除</button>
+        <button class="btn ghost editMemo" type="button">編集</button>
+        <button class="btn ghost delMemo" type="button">削除</button>
       </div>
     `;
-    el.querySelector("button").addEventListener("click", () => {
+
+    el.querySelector(".editMemo").addEventListener("click", () => editMemo(m));
+    el.querySelector(".delMemo").addEventListener("click", () => {
       const ok = confirm("このメモを削除しますか？");
       if (ok) deleteMemo(m.memo_id);
     });
+
     list.appendChild(el);
   }
 }
@@ -302,15 +348,17 @@ async function renderTasks() {
       </div>
       <div class="right">
         <span class="badge ${t.done ? "done" : "todo"}">${t.done ? "〇 完了" : "× 未完了"}</span>
-        <button class="btn ghost toggle">${t.done ? "戻す" : "完了"}</button>
-        <button class="btn ghost del">削除</button>
+        <button class="btn ghost toggle" type="button">${t.done ? "戻す" : "完了"}</button>
+        <button class="btn ghost delTask" type="button">削除</button>
       </div>
     `;
+
     el.querySelector(".toggle").addEventListener("click", () => toggleTaskDone(t));
-    el.querySelector(".del").addEventListener("click", () => {
+    el.querySelector(".delTask").addEventListener("click", () => {
       const ok = confirm("このタスクを削除しますか？");
       if (ok) deleteTask(t.id);
     });
+
     list.appendChild(el);
   }
 }
@@ -334,37 +382,11 @@ function setupTabs() {
   });
 }
 
-// ===== Toast (simple) =====
-let toastTimer;
-function toast(msg) {
-  clearTimeout(toastTimer);
-  let el = $("#toast");
-  if (!el) {
-    el = document.createElement("div");
-    el.id = "toast";
-    el.style.position = "fixed";
-    el.style.left = "50%";
-    el.style.bottom = "70px";
-    el.style.transform = "translateX(-50%)";
-    el.style.padding = "10px 12px";
-    el.style.borderRadius = "14px";
-    el.style.border = "1px solid rgba(255,255,255,.12)";
-    el.style.background = "rgba(11,18,32,.92)";
-    el.style.color = "rgba(232,238,252,.95)";
-    el.style.backdropFilter = "blur(10px)";
-    el.style.zIndex = "9999";
-    document.body.appendChild(el);
-  }
-  el.textContent = msg;
-  el.style.opacity = "1";
-  toastTimer = setTimeout(() => { el.style.opacity = "0"; }, 1800);
-}
-
 // ===== Init =====
 async function main() {
   await openDB();
 
-  // UI hooks
+  // hooks（存在チェックも兼ねる）
   $("#newTodayBtn").addEventListener("click", ensureTodayJour);
   $("#addMemoBtn").addEventListener("click", addMemo);
   $("#addTaskBtn").addEventListener("click", addTask);
@@ -376,12 +398,16 @@ async function main() {
 
   setupTabs();
 
-  // Start with today
+  // Start
   $("#todayPill").textContent = todayISO();
   await ensureTodayJour();
+  toast("✅ 起動しました");
 }
 
-main().catch((e) => {
-  console.error(e);
-  alert("初期化に失敗しました。ブラウザがIndexedDBに対応しているか確認してね。");
+// ✅ 確実にDOMができてから開始
+document.addEventListener("DOMContentLoaded", () => {
+  main().catch((e) => {
+    console.error(e);
+    alert("初期化に失敗しました。Consoleのエラーを確認してね。");
+  });
 });
