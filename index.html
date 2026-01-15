@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Journal Project</title>
+  <link rel="stylesheet" href="style.css" />
+  <meta name="theme-color" content="#0b1220">
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">J</div>
+      <div>
+        <div class="title">Journal Project</div>
+        <div class="subtitle">ジャーナルを書いて一日を始めよう</div>
+      </div>
+    </div>
+
+    <div class="today">
+      <div class="pill" id="todayPill">Today</div>
+      <button class="btn ghost" id="newTodayBtn" title="今日のジャーナルを作成/表示">今日</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card hero">
+      <div class="hero-left">
+        <h1 id="heroTitle">今日のジャーナル</h1>
+        <p id="heroDesc">メモとタスクを追加して、1日を整理しよう。</p>
+      </div>
+      <div class="hero-right">
+        <button class="btn" id="addMemoQuick">＋ メモ</button>
+        <button class="btn" id="addTaskQuick">＋ タスク</button>
+      </div>
+    </section>
+
+    <section class="grid">
+      <!-- Left: Journal list -->
+      <section class="card">
+        <div class="card-head">
+          <h2>ジャーナル一覧</h2>
+          <div class="head-actions">
+            <button class="btn ghost" id="refreshJour">更新</button>
+          </div>
+        </div>
+
+        <div class="searchrow">
+          <input class="input" id="jourSearch" placeholder="例）2026-01 / タイトル検索" />
+        </div>
+
+        <div class="list" id="jourList" aria-live="polite"></div>
+
+        <div class="hint">
+          ※ 「今日」ボタンで <b>今日の日付</b> のジャーナルを自動作成（すでにあれば開く）
+        </div>
+      </section>
+
+      <!-- Right: Memos + Tasks -->
+      <section class="card">
+        <div class="tabs">
+          <button class="tab active" data-tab="memos">メモ</button>
+          <button class="tab" data-tab="tasks">タスク</button>
+        </div>
+
+        <!-- MEMOS -->
+        <div class="pane" id="pane-memos">
+          <div class="card-head">
+            <h2>メモ</h2>
+            <button class="btn" id="addMemoBtn">＋ 追加</button>
+          </div>
+
+          <div class="list" id="memoList"></div>
+        </div>
+
+        <!-- TASKS -->
+        <div class="pane hidden" id="pane-tasks">
+          <div class="card-head">
+            <h2>タスク</h2>
+            <button class="btn" id="addTaskBtn">＋ 追加</button>
+          </div>
+
+          <div class="filters">
+            <label class="chip">
+              <input type="checkbox" id="hideDone" />
+              完了を隠す
+            </label>
+          </div>
+
+          <div class="list" id="taskList"></div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- Modal -->
+  <dialog class="modal" id="modal">
+    <form method="dialog" class="modal-box" id="modalForm">
+      <div class="modal-head">
+        <h3 id="modalTitle">入力</h3>
+        <button class="btn ghost" value="cancel" aria-label="閉じる">✕</button>
+      </div>
+
+      <label class="field">
+        <span id="modalLabel">タイトル</span>
+        <input class="input" id="modalInput" autocomplete="off" maxlength="120" required />
+      </label>
+
+      <div class="modal-actions">
+        <button class="btn ghost" value="cancel">キャンセル</button>
+        <button class="btn" id="modalOk" value="ok">OK</button>
+      </div>
+      <p class="small" id="modalHelp"></p>
+    </form>
+  </dialog>
+
+  <footer class="footer">
+    <span>保存先：この端末のブラウザ（サーバ不要）</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
